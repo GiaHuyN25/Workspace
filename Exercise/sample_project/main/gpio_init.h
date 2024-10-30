@@ -1,5 +1,5 @@
-#ifndef INPUT_IO_H
-#define INPUT_IO_H
+#ifndef GPIO_INIT_H
+#define GPIO_INIT_H
 #include "esp_err.h"
 #include "hal/gpio_types.h"
 
@@ -24,7 +24,11 @@ typedef enum {
 } pull_state_t;
 
 esp_err_t input_init(gpio_num_t gpio_num, interrupt_type_edle_t type, pull_state_t state);
+esp_err_t output_init(gpio_num_t gpio_num, interrupt_type_edle_t type_intr, state_t state);
+esp_err_t input_output_init(gpio_num_t gpio_num, interrupt_type_edle_t type_intr, pull_state_t state, state_t level);
+
 esp_err_t input_io_get_level(gpio_num_t gpio_num);
+
 void input_set_callback(void * cb);
 
 #endif

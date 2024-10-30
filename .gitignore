@@ -3,4 +3,6 @@
 **/.vscode
 .o
 .old
-esp-idf-v5.3.1
+esp-idf-v5.3.1/
+dev_minihub/
+devminihub.zip
