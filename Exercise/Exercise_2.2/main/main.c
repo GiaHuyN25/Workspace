@@ -1,93 +1,168 @@
 #include <stdio.h>
-#include <stdint.h>
-#include <esp_log.h>
+#include <string.h>
 #include <driver/gpio.h>
+#include <driver/uart.h>
+#include <esp_log.h>
 #include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/timers.h>
 #include <freertos/event_groups.h>
-#include "freertos/queue.h"
-#include <esp_rom_gpio.h>
-#include <esp_timer.h>
-#include "driver/uart.h"
-#include "sdkconfig.h"
-#include "gpio_init.h"
+#include <freertos/queue.h>
+#include <freertos/timers.h>
+#include <gpio_init.h>
 
-#define UART        UART_NUM_0
+#define UART                UART_NUM_1
+#define TX_PIN              GPIO_NUM_2
+#define RX_PIN              GPIO_NUM_4
+#define BUTTON              GPIO_NUM_12
+#define BLINK               GPIO_NUM_26
+#define POWER               GPIO_NUM_15
 
-#define UART_BIT    (1 << 0)
-#define BLINK_BIT   (1 << 1)
+#define BIT_BLINK_EVENT     (1 << 0)
+#define BIT_UART_EVENT      (1 << 1)
 
-#define BUF_SIZE    1024
+#define BUFFER              1024
 
-
-
-static const char *TAG = "UART_Event";
-
-static EventGroupHandle_t xEvent;
 static QueueHandle_t uart_queue;
-static uart_event_t event;
+static EventGroupHandle_t xEvent;
+static TimerHandle_t xTimer[1];
 
-void uart_event_task(void *pvParameter);
-void event_handler_task(void *pvParameter);
-void uart_task();
-void uart_event(QueueHandle_t uart_q);
+void UART_Task(void *pvParameter);
+void Event_Task(void *pvParameter);
+
+void button_callback(int pin);
+void Timer_Callback(TimerHandle_t xTimer);
+void blink(int pin);
 
 void app_main(void)
 {
-    xEvent = xEventGroupCreate();
-
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
         .source_clk = UART_SCLK_APB,
     };
-
+    uart_driver_install(UART, BUFFER * 2, BUFFER * 2, 20, &uart_queue, NULL);
     uart_param_config(UART, &uart_config);
-    uart_driver_install(UART, BUF_SIZE * 2, BUF_SIZE * 2, 20, &uart_queue, 0);
+    uart_set_pin(UART, TX_PIN, RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
-    uart_set_callback(uart_event_task);
+    input_init(BUTTON, HI_TO_LO, PULL_UP);
+    input_output_init(BLINK, NO_INTR, NO_PULL, ON);
+    output_init(POWER, NO_INTR, ON);
 
-    xTaskCreate(uart_event_task, "uart_event_task", BUF_SIZE * 2, NULL, 12, NULL);
-    xTaskCreate(event_handler_task, "event_handler_task", 2048, NULL, 10, NULL);
+    xTimer[0] = xTimerCreate("Timer Blink:", pdMS_TO_TICKS(500), pdTRUE, (void *) 0, Timer_Callback);
+
+    xEvent = xEventGroupCreate();
+
+    input_set_callback(button_callback);
+
+    xTaskCreate(UART_Task, "UART Task", 2*1024, NULL, 4, NULL);
+    xTaskCreate(Event_Task, "Event Task", 2* 1024, NULL, 4, NULL);
+    
 }
 
-void uart_event_task(void *pvParameter)
+void button_callback(int pin)
 {
-    uart_event(uart_queue);
-}
-
-void event_handler_task(void *pvParameter)
-{
-    EventBits_t uxBits;
-    uxBits = xEventGroupWaitBits(xEvent, UART_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
-    if(uxBits & UART_BIT)
+    if (pin == BUTTON)
     {
-        ESP_LOGI(TAG,"UART event done.");
-        uart_task();
+        BaseType_t pxHigherPriorityTaskWoken;
+        xEventGroupSetBitsFromISR(xEvent, BIT_BLINK_EVENT, &pxHigherPriorityTaskWoken);
     }
 }
 
-void uart_task()
+void Timer_Callback(TimerHandle_t xTimer)
 {
-    uint8_t *dtmp = (uint8_t) malloc(BUF_SIZE);
-    if(event.type == UART_DATA)
+    uint32_t ulCount;
+
+    configASSERT( xTimer);
+
+    ulCount = (uint32_t ) pvTimerGetTimerID(xTimer);
+
+    switch(ulCount){
+        case 0:
+            blink(BLINK);
+            break;
+    }
+}
+
+void blink(int pin)
+{
+    int stt = gpio_get_level(BLINK);
+    gpio_set_level(BLINK, 1 - stt);
+    if(gpio_get_level(BUTTON) == ON)
     {
-        int len = uart_read_bytes(UART, dtmp, event.size, portMAX_DELAY);
-        if(len > 0)
+        xTimerStop(xTimer[0], portMAX_DELAY);
+    }
+}
+
+void UART_Task(void *pvParameter)
+{
+    uart_event_t event;
+    uint8_t *data = (uint8_t*) malloc(BUFFER);
+    while(1)
+    {
+        if(xQueueReceive(uart_queue, (void *)&event, (TickType_t) portMAX_DELAY))
         {
-            ESP_LOGI(TAG, "Received: %s", (char *)dtmp);
+            bzero(data, BUFFER);
+            ESP_LOGI("UART:", "UART num %d event.", UART);
+            switch(event.type)
+            {
+                case UART_DATA:
+                    ESP_LOGI("UART:", "[UART DATA]: %d", event.size);
+                    uart_read_bytes(UART, data, event.size, portMAX_DELAY);
+                    uart_write_bytes(UART, (const char*) data, event.size);
+                    xEventGroupSetBits(xEvent, BIT_UART_EVENT);
+                    break;
+                case UART_FIFO_OVF:
+                ESP_LOGI("UART:", "hw fifo overflow");
+                    uart_flush_input(UART);
+                    xQueueReset(uart_queue);
+                    break;
+
+                case UART_BUFFER_FULL:
+                    uart_flush_input(UART);
+                    xQueueReset(uart_queue);
+                    break;
+
+                case UART_BREAK:
+                    ESP_LOGI("UART:", "uart rx break");
+                    break;
+
+                case UART_PARITY_ERR:
+                    ESP_LOGI("UART:", "uart parity error");
+                    break;
+
+                case UART_FRAME_ERR:
+                    ESP_LOGI("UART:", "uart frame error");
+                    break;
+
+                default:
+                    ESP_LOGI("UART:", "uart event type: %d", event.type);
+                break;
+            }
         }
     }
 }
 
-void uart_event(QueueHandle_t uart_q)
+void Event_Task(void *pvParameter)
 {
-    if(xQueueReceive(uart_q, (void*)&event, (TickType_t) portMAX_DELAY))
+    while(1)
     {
-        xEventGroupSetBits(xEvent, UART_BIT);
+        EventBits_t xBit;
+        xBit = xEventGroupWaitBits(xEvent,
+                            BIT_BLINK_EVENT | BIT_UART_EVENT,
+                            pdTRUE,
+                            pdFALSE,
+                            portMAX_DELAY);
+
+        if(xBit & BIT_BLINK_EVENT)
+        {
+            ESP_LOGI("Blink Task:", "Start Blink.");
+            xTimerStart(xTimer[0], 0);
+        }
+        if(xBit & BIT_UART_EVENT)
+        {
+            ESP_LOGI("UART:", "UART event completed.");
+        }
     }
 }

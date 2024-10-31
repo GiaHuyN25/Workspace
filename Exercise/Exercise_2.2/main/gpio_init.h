@@ -31,6 +31,5 @@ esp_err_t input_output_init(gpio_num_t gpio_num, interrupt_type_edle_t type_intr
 esp_err_t input_io_get_level(gpio_num_t gpio_num);
 
 void input_set_callback(void * cb);
-void uart_set_callback(void *cb);
 
 #endif

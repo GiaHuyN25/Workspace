@@ -102,8 +102,3 @@ esp_err_t input_output_init(gpio_num_t gpio_num, interrupt_type_edle_t type_intr
 
     return ESP_OK;
 }
-
-void uart_set_callback(void *cb)
-{
-    uart_callback = cb;
-}
