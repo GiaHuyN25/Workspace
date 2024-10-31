@@ -5,6 +5,7 @@
 #include "gpio_init.h"
 
 input_callback_t input_callback = NULL;
+uart_callback_t uart_callback = NULL;
 
 static void IRAM_ATTR gpio_input_handler(void *arg)
 {
@@ -100,4 +101,9 @@ esp_err_t input_output_init(gpio_num_t gpio_num, interrupt_type_edle_t type_intr
     gpio_set_level(gpio_num, level);
 
     return ESP_OK;
+}
+
+void uart_set_callback(void *cb)
+{
+    uart_callback = cb;
 }

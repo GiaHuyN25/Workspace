@@ -1,16 +1,13 @@
 #include <stdio.h>
 #include <stdint.h>
-#include <string.h>
 #include <esp_log.h>
 #include <driver/gpio.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/timers.h>
 #include <freertos/event_groups.h>
-#include "freertos/queue.h"
 #include <esp_rom_gpio.h>
 #include <esp_timer.h>
-#include "driver/uart.h"
 #include "sdkconfig.h"
 #include "gpio_init.h"
 #include "timer_button.h"
