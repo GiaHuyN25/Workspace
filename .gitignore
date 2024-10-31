@@ -1,6 +1,7 @@
 **/build/
 **/.devcontainer
 **/.vscode
+**/Config_Code_Feature_Test
 sdkconfig
 *.old
 esp-idf-v5.3.1/
