@@ -24,6 +24,9 @@
 static QueueHandle_t uart_queue;
 static EventGroupHandle_t xEvent;
 static TimerHandle_t xTimer[1];
+static BaseType_t pxHigherPriorityTaskWoken;
+
+static uint64_t ms = 500;
 
 void UART_Task(void *pvParameter);
 void Event_Task(void *pvParameter);
@@ -31,6 +34,7 @@ void Event_Task(void *pvParameter);
 void button_callback(int pin);
 void Timer_Callback(TimerHandle_t xTimer);
 void blink(int pin);
+uint64_t getNumber(char *str);
 
 void app_main(void)
 {
@@ -50,13 +54,14 @@ void app_main(void)
     input_output_init(BLINK, NO_INTR, NO_PULL, ON);
     output_init(POWER, NO_INTR, ON);
 
-    xTimer[0] = xTimerCreate("Timer Blink:", pdMS_TO_TICKS(500), pdTRUE, (void *) 0, Timer_Callback);
+    xTaskCreate(UART_Task, "UART Task", 2*1024, NULL, 4, NULL);
+
+    xTimer[0] = xTimerCreate("Timer Blink:", pdMS_TO_TICKS(ms), pdTRUE, (void *) 0, Timer_Callback);
 
     xEvent = xEventGroupCreate();
 
     input_set_callback(button_callback);
 
-    xTaskCreate(UART_Task, "UART Task", 2*1024, NULL, 4, NULL);
     xTaskCreate(Event_Task, "Event Task", 2* 1024, NULL, 4, NULL);
     
 }
@@ -65,7 +70,6 @@ void button_callback(int pin)
 {
     if (pin == BUTTON)
     {
-        BaseType_t pxHigherPriorityTaskWoken;
         xEventGroupSetBitsFromISR(xEvent, BIT_BLINK_EVENT, &pxHigherPriorityTaskWoken);
     }
 }
@@ -95,6 +99,17 @@ void blink(int pin)
     }
 }
 
+uint64_t getNumber(char *str)
+{
+    uint64_t number;
+    if(sscanf(str, "%*[^0-9]%lld", &number))
+    {
+        
+        return number;
+    }
+    return 500;
+}
+
 void UART_Task(void *pvParameter)
 {
     uart_event_t event;
@@ -111,6 +126,9 @@ void UART_Task(void *pvParameter)
                     ESP_LOGI("UART:", "[UART DATA]: %d", event.size);
                     uart_read_bytes(UART, data, event.size, portMAX_DELAY);
                     uart_write_bytes(UART, (const char*) data, event.size);
+                    ms = getNumber((char *)data);
+                    ESP_LOGI("PERIOD:","%lld ms", ms);
+                    xTimerChangePeriodFromISR(xTimer[0], pdMS_TO_TICKS(ms), pxHigherPriorityTaskWoken);
                     xEventGroupSetBits(xEvent, BIT_UART_EVENT);
                     break;
                 case UART_FIFO_OVF:
