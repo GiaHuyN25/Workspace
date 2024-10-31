@@ -1,8 +1,8 @@
 **/build/
 **/.devcontainer
 **/.vscode
-.o
-.old
+sdkconfig
+*.old
 esp-idf-v5.3.1/
 dev_minihub/
 devminihub.zip
