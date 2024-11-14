@@ -32,7 +32,7 @@ static int Position[4]  =   {D1,D2,D3,D4};
 
 //Counting
 static int counting = 999;
-static int input = 1500;
+static int input = 1003;
 
 //Display function
 void Number_Display(void * pvParameter);
@@ -56,10 +56,6 @@ void app_main() {
     ESP_LOGI(TAG, "%lu", esp_get_free_heap_size());
 
     xTaskCreate(Number_Display, "Number Display", 4096, NULL, 4, NULL);
-    // xTaskCreate(Number1,"Number 1", 1024, NULL, 4, NULL);
-    // xTaskCreate(Number2,"Number 1", 1024, NULL, 4, NULL);
-    // xTaskCreate(Number3,"Number 1", 1024, NULL, 4, NULL);
-    // xTaskCreate(Number4,"Number 1", 1024, NULL, 4, NULL);
     xTaskCreate(CountTask, "Counting Task", 1024*8, NULL, 8, NULL);
 
 }
@@ -75,9 +71,12 @@ void CountTask(void * pvParamter)
 {
     while(1)
     {
-        ESP_LOGI(TAG, "Counting to %d", counting);
+        ESP_LOGI(TAG, "Counting to %d, remaining %lu bytes", counting, esp_get_free_heap_size());
         if(counting < input){
             counting += 1;
+        }
+        else{
+            counting = 0;
         }
         vTaskDelay(1000/portTICK_PERIOD_MS);
     }
