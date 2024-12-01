@@ -24,16 +24,18 @@
 #include "sdkconfig.h"
 
 /* Constants that aren't configurable in menuconfig */
-#define WEB_SERVER "example.com"
-#define WEB_PORT "80"
-#define WEB_PATH "/"
+// #define WEB_SERVER "example.com"
+// #define WEB_PORT "80"
+// #define WEB_PATH "/"
+
+#define WEB_SERVER  "api.thingspeak.com"
+#define WEB_PORT    "80"
 
 static const char *TAG = "example";
 
-static const char *REQUEST = "GET " WEB_PATH " HTTP/1.0\r\n"
-    "Host: "WEB_SERVER":"WEB_PORT"\r\n"
-    "User-Agent: esp-idf/1.0 esp32\r\n"
-    "\r\n";
+char REQUEST[512];
+char SUBREQUEST[100];
+char recv_buf[512];
 
 static void http_get_task(void *pvParameters)
 {
@@ -44,7 +46,6 @@ static void http_get_task(void *pvParameters)
     struct addrinfo *res;
     struct in_addr *addr;
     int s, r;
-    char recv_buf[64];
 
     while(1) {
         int err = getaddrinfo(WEB_SERVER, WEB_PORT, &hints, &res);
@@ -81,8 +82,20 @@ static void http_get_task(void *pvParameters)
         ESP_LOGI(TAG, "... connected");
         freeaddrinfo(res);
 
+        // sprintf(SUBREQUEST, "api_key=2J2CAIMN28RURF6E&field1=%d&field2=%d", 50, 50);
+        // sprintf(REQUEST, 
+        //         "POST /update.json HTTP/1.1\r\n"
+        //         "Host: %s\r\n"
+        //         "Connection: close\r\n"
+        //         "Content-Type: application/x-www-form-urlencoded\r\n"
+        //         "Content-Length: %d\r\n\r\n"
+        //         "%s", 
+        //         WEB_SERVER, strlen(SUBREQUEST), SUBREQUEST);
+
+        sprintf(REQUEST, "GET https://api.thingspeak.com/channels/2724105/feeds.json?api_key=AAW8B9JI1WFH4UER&results=2\n\n");
+
         if (write(s, REQUEST, strlen(REQUEST)) < 0) {
-            ESP_LOGE(TAG, "... socket send failed");
+            ESP_LOGE(TAG, "... socket send failed errno=%d", errno);
             close(s);
             vTaskDelay(4000 / portTICK_PERIOD_MS);
             continue;
