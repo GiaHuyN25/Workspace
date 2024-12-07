@@ -31,28 +31,42 @@
 #define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD WIFI_AUTH_WAPI_PSK
 #endif
 
+
 #define MAX_RETRY               10
 
+//Web Server
 #define WEB_SERVER  "api.thingspeak.com"
 #define WEB_PORT    "80"
 
+//Event Group Bit for Wifi connecting event
 #define WIFI_CONNECTED_BIT      BIT0
 #define WIFI_FAILED_BIT         BIT1
 
+//Wifi Information Validication type for error handling
 typedef enum {
     VALID, NO_SSID, NO_PASSWORD, CONFIRM,
 } ssid_valid_t;
 
-
+//Wifi initiation
 void wifi_init(char SSID[30], char PASSWORD[30], esp_event_handler_t *wifi_event_handler,
                 esp_event_handler_instance_t *wifi_instance_any_id, 
                 esp_event_handler_instance_t *wifi_instance_got_ip);
+
+//Wifi cleanup
 void wifi_cleanup(esp_event_handler_instance_t wifi_instance_any_id, 
                     esp_event_handler_instance_t wifi_instance_got_ip);
+
+//Connect to web webserver, Initiate address, socket
 void http_connect(struct addrinfo http_hints, struct addrinfo *result, 
                     struct in_addr *address, int *http_socket);
+
+//Send socket request
 void http_write(int *http_socket, char http_request[512]);
+
+//Read socket response
 void http_read(int http_socket, int *http_read, char http_receive[512]);
+
+//Set timeout for receiving response
 void http_set_receive_timeout(int *http_socket, int timeout);
 
 #endif

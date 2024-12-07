@@ -3,25 +3,29 @@
 -----------------------------------------------------------------------------------------------------------------------------
     REQUIREMENTS:
         Configure Wifi SSID and Password from UART
-        Read Value from a Sensor
+        Read Value from a Sensor - HW038
         Using GET POST to post data from Sensor to api.thingspeak.com
 -----------------------------------------------------------------------------------------------------------------------------
     DETAILS:
         Use UART-to-USB converter to transfer data (SSID, PASSWORD, CONFIRM) through UART num 1 from computer to ESP32
         The transfer data string needs to contain these format: "ssid ##########" for SSID and "pass ########" for Password
-        
-
+        Transfer data from hw038 to api.thingspeak.com
 */
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+
 #include <driver/gpio.h>
 #include <driver/uart.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+
+#include "esp_adc/adc_oneshot.h"
+#include "esp_err.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -30,8 +34,8 @@
 #include "esp_mac.h"
 #include "esp_sntp.h"
 #include "esp_netif_sntp.h"
-#include "lwip/inet.h"
 
+#include "lwip/inet.h"
 #include "lwip/err.h"
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
@@ -40,22 +44,25 @@
 #include "sdkconfig.h"
 
 #include "wifi_lib.h"
+#include "gpio_init.h"
 
 
 static char *WIFI_TAG = "Wifi Station Mode";
 static char *UART_TAG = "UART Event";
-static char *HTTP_TAG = "HTTP Event";
+
+//Define sensor pin
+#define HW038_DATA          ADC_CHANNEL_4   //GPIO_NUM_32   //HW308 data pin
 
 
 //Define UART pin
-#define UART_PORT           UART_NUM_1
-#define UART_TX             GPIO_NUM_2
-#define UART_RX             GPIO_NUM_4
-#define BUFFER              1024
+#define UART_PORT           UART_NUM_1                      //UART port
+#define UART_TX             GPIO_NUM_2                      //Data UART Transmit GPIO
+#define UART_RX             GPIO_NUM_4                      //Data UART Receive GPIO
+#define BUFFER              1024                            //Buffer length unit
 
 static EventGroupHandle_t s_uart_event_group;
 
-#define UART_RECV_BIT       BIT0    //UART Event Bits
+#define UART_RECV_BIT       BIT0                            //UART Event Bits
 #define UART_PROCESS_BIT    BIT1
 
 static QueueHandle_t uart_event;
@@ -67,45 +74,32 @@ static EventGroupHandle_t s_wifi_event_group;
 static char SSID[30] = "Phong301_an_trai";
 static char PASSWORD[30] = "12344321";
 
-static esp_event_handler_instance_t instance_any_id;
+static esp_event_handler_instance_t instance_any_id;        
 static esp_event_handler_instance_t instance_got_ip;
 
-    static int retry_count = 0;
+static int retry_count = 0;
+static int wifi_state = 0;                                  //Wifi connected or not connected
 
 //HTTP Protocol
 static EventGroupHandle_t s_http_event_group;
 
-#define HW038_RECEIVE_BIT   BIT0
-
-static char REQUEST[512];
-static char SUBREQUEST[128];
-static char HTTP_RECV[512];
-
-typedef enum http_data
-{
-    HW038_event = 1,
-    DHT11_temp_event = 2,
-    DHT11_hum_event = 3,
-}http_data_t;
-
-//HTTP data test
-static int hw038 = 0;
-
-void test_task(void *pvParameter)
-{
-    while(1)
-    {
-        hw038 =  rand() % 101;
-        printf("%d\n", hw038);
-        xEventGroupSetBits(s_http_event_group, HW038_RECEIVE_BIT);
-        vTaskDelay(20000/portTICK_PERIOD_MS);
-    }
-}
-
+static char REQUEST[512];                                   //HTTP Request string
+static char HTTP_RECV[512];                                 //HTTP Receive string
 
 //RTC 
-static time_t now = 0;
-static struct tm timeinfo = {0};
+static time_t now = 0;                                      //Time now
+static struct tm timeinfo = {0};                            //Information for getting time
+
+//HTTP data test
+#define HW038_RECEIVE_BIT   BIT0                            //HW038 Event Group Bit 
+
+static float hw038 = 0;
+static adc_oneshot_unit_handle_t hw038_handle;              //ADC unit handle
+
+void hw038_read(float *HW038);                              //Read HW038 sensor by ADC
+void hw038_task(void *pvParameter);                         //Handle HW038 receiving data
+float calculate_water_height(float raw_data);               //Calculate water level by input voltage
+
 
 //Wifi functions
 void Wifi_Task(void *pvParameter);                          //Report about Wifi connecting status
@@ -122,19 +116,19 @@ void UART_Task(void *pvParameter);                          //UART Receive Data
 
 
 //HTTP Functions
-void http_task(void *pvParameter);
-void http_handle();
-void http_request(int s, int *r, int HW038);
+void http_task(void *pvParameter);                          //HTTP event when an event occurs
+void http_handle();                                         //HTTP initiate socket and send request
+void http_request(int s, int *r, float HW038);              //Send HTTP request
 
 
 //SNTP Functions
 void initialize_sntp();                                     //RTC initializing
 void time_sync_noti_cb(struct timeval *tv);                 //SNTP initialization success callback
-void get_time();
+void get_time();                                            //Get time from SNTP
 
 void app_main(void)
 {
-    //Initialize NVS
+    //Initialize NVS for wifi station mode
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
@@ -142,6 +136,15 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    //Initiate HW038 sensor read
+    adc_gpio_init(HW038_DATA, ADC_UNIT_1, &hw038_handle);
+    if (hw038_handle == NULL) 
+    {
+        ESP_LOGE("hw038_read", "hw038_handle is NULL");
+    }
+    else{
+        printf("hw038_handle address: %d\n", (int) &hw038_handle);
+    }
 
     //UART and Wifi Group Event Initializing
     s_uart_event_group = xEventGroupCreate();
@@ -165,10 +168,14 @@ void app_main(void)
     initialize_sntp();
   
     get_time(&now, &timeinfo);
-
-    xTaskCreate(test_task, "Test Task", 2*1024, NULL, 11, NULL);
-    xTaskCreate(http_task, "HTTP Task", 10*1024, NULL, 10, NULL);
-
+    xTaskCreate(hw038_task, "Sensor Task", 20*1024, NULL, 10, NULL);
+    xTaskCreate(http_task, "HTTP Task", 10*1024, NULL, 11, NULL);
+    vTaskDelay(20000 / portTICK_PERIOD_MS);
+    while(1)
+    {
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        xEventGroupSetBits(s_wifi_event_group, HW038_RECEIVE_BIT);
+    }
 }
 
 void UART_Config(void)
@@ -269,6 +276,7 @@ void Wifi_Info_Validication(int validication)
     case CONFIRM:
         // wifi_cleanup();
         // wifi_init_sta();
+        wifi_state = 0;
         wifi_cleanup(instance_any_id, instance_got_ip);
         wifi_init(SSID, PASSWORD, &event_handler, &instance_any_id, &instance_got_ip);
         break;
@@ -369,6 +377,7 @@ void Wifi_Task(void *pvParameter)
         {
             ESP_LOGI(WIFI_TAG, "Wifi connected succesfully.");
             uart_write_bytes(UART_PORT, "Connected successfully.\n", 25);
+            wifi_state = 1;
         }
         else if( bits & WIFI_FAILED_BIT)
         {
@@ -389,7 +398,7 @@ void Wifi_Task(void *pvParameter)
 
 void time_sync_noti_cb(struct timeval *tv)
 {
-    printf("Time synced: %lld\n", tv->tv_sec);
+    printf("Time sync.\n");
 }
 
 void initialize_sntp()
@@ -416,12 +425,47 @@ void get_time()
     ESP_LOGI("SNTP", "Current time: %s", strftime_buf);
 }
 
-void http_request(int s, int *r, int HW038)
+void hw038_read(float *HW038)
+{    
+    float old_hw038 = *HW038;
+    int hw038_raw;
+    ESP_ERROR_CHECK(adc_oneshot_read(hw038_handle, HW038_DATA, &hw038_raw));
+    printf("HW038 raw data: %.2f.\n", (float) hw038_raw);
+    *HW038 = calculate_water_height((float) hw038_raw);
+    printf("HW038: %.2f.\n", *HW038);
+}
+
+float calculate_water_height(float raw_data)
+{
+    if (raw_data < 330) return 0.0;
+    if (raw_data > 2000) return 4.5;
+    
+    float water_height = ((raw_data - 330) / (2000 - 330)) * 4.5;
+    
+    return water_height;
+}
+
+void hw038_task(void *pvParameter)
+{
+    
+    while (1)
+    {
+        if(wifi_state == 1)
+        {
+            hw038_read(&hw038);
+            xEventGroupSetBits(s_http_event_group, HW038_RECEIVE_BIT);
+            vTaskDelay(5000/portTICK_PERIOD_MS);
+        }
+        vTaskDelay(5000/portTICK_PERIOD_MS);
+    }
+}
+
+void http_request(int s, int *r, float HW038)
 {
     while (1)
     {
-        printf("hw038 = %d\n", HW038);
-        sprintf(REQUEST, "GET https://api.thingspeak.com/update?api_key=2J2CAIMN28RURF6E&field1=%d\n\n", HW038);
+        printf("hw038 = %.2f\n", HW038);
+        sprintf(REQUEST, "GET https://api.thingspeak.com/update?api_key=2J2CAIMN28RURF6E&field1=%.2f\n\n", HW038);
 
         http_write(&s, REQUEST);
 
