@@ -7,14 +7,18 @@ This exercise is about reading HW038 data and send to api.thingspeak.com and con
 
 ## How to use example
 
+```
 HW038 data pin connect to GPIO 32
 UART TX pin is GPIO 2
 UART RX pin is GPIO 4
+```
 
 ### Configure the project
 
+```
 Change web server and web port in wifi_lib.h 
 Change SSID and Password for Wifi in main.c
+```
 
 ### Build and Flash
 
@@ -32,6 +36,7 @@ See the Getting Started Guide for all the steps to configure and use the ESP-IDF
 
 ## Example Output
 
+```
 I (559) main_task: Calling app_main()
 Initiated ADC.
 hw038_handle address: 1073432220
@@ -72,7 +77,9 @@ I (889) wifi:state: assoc -> run (0x10)
 I (899) wifi:connected with Phong301_an_trai, aid = 5, channel 3, BW20, bssid = 90:6a:94:2c:ba:2e
 I (899) wifi:security: WPA2-PSK, phy: bgn, rssi: -40
 I (909) wifi:pm start, type: 1
+```
 
+```
 I (909) wifi:dp: 1, bi: 102400, li: 3, scale listen interval from 307200 us to 307200 us
 I (919) wifi:AP's beacon interval = 102400 us, DTIM period = 1
 I (1919) esp_netif_handlers: sta ip: 192.168.10.13, mask: 255.255.255.0, gw: 192.168.10.1
@@ -99,6 +106,8 @@ I (19579) HTTP: ... socket send success
 I (19579) HTTP: ... set socket receiving timeout success
 177
 I (19899) HTTP: ... done reading from socket. Last read return=0 errno=128.
+```
+
 
 ## Troubleshooting
 
