@@ -1,0 +1,342 @@
+<!DOCTYPE HTML><html>
+<head>
+  <title>PROJECT1</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+  <link rel="icon" href="data:,">
+  <style>
+    html {font-family: Arial; display: inline-block; text-align: center;}
+    p {  font-size: 1.2rem;}
+    body {  margin: 0;}
+    .topnav { overflow: hidden; background-color: #2f4468; color: white; font-size: 1.7rem; }
+    
+    .card { background-color: white; box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5); }
+    .cards { max-width: 400px; margin: 0 auto; display: grid; grid-gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .reading { font-size: 2.8rem; }
+    .packet { color: #bebebe; }
+
+
+    .card.temperature { color: #fd7e14; }
+    .card.humidity { color: #1b78e2; }
+    .card.water-volume { color: #1b78e2; }
+    .card.solid-humidity { color: #1b78e2; }
+    .card.plant_Status {
+      color: #28e21b; 
+      width: 400px; 
+      padding: 20px; 
+      border: 1px solid #ccc; 
+      border-radius: 8px;
+    }
+
+.content { 
+  display: flex;
+  flex-direction: row;
+  padding: 20px;
+  width: 100%;
+}
+
+.chart-content {
+  flex: 3;
+  border-right: 5px solid #cccccc;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap; 
+  justify-content: center; 
+  align-items: center; 
+  gap: 5px; 
+}
+
+.main-content {
+  flex: 1;
+  padding: 50px;
+  box-sizing: border-box;
+  gap: 20px;
+}
+
+@media (max-width: 768px) {
+  .content {
+    flex-direction: column; 
+    padding: 20px;
+  }
+  
+  .chart-content {
+    border-right: none;
+    border-bottom: 2px solid #cccccc;
+  }
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 60px;
+  height: 34px;
+}
+
+.switch input { 
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 26px;
+  width: 26px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #2196F3;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(26px);
+  -ms-transform: translateX(26px);
+  transform: translateX(26px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.ManualModeContent 
+
+#ManualModeContent {
+  transition: all 0.3s ease;
+}
+
+.blurContent {
+  filter: blur(5px);
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.unblurContent {
+  filter: none;
+  pointer-events: auto;
+}
+
+</style>
+</head>
+<body>
+  <div class="topnav">
+    <h3>PROJECT1</h3>
+  </div>
+
+  <div class="content">
+    <div class="chart-content">
+
+      <iframe id = "chart1" width="450" height="260" style="border: 2px solid #cccccc; margin: 10px;" 
+        src="https://thingspeak.com/channels/2724105/charts/1?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line&update=15"></iframe>
+      <iframe id = "chart2" width="450" height="260" style="border: 2px solid #cccccc; margin: 10px;" 
+        src="https://thingspeak.com/channels/2724105/charts/2?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line&update=15"></iframe>
+      <iframe id = "chart3" width="450" height="260" style="border: 2px solid #cccccc; margin: 10px;" 
+        src="https://thingspeak.com/channels/2724105/charts/3?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line&update=15"></iframe>
+      <iframe id = "chart4" width="450" height="260" style="border: 2px solid #cccccc; margin: 10px;" 
+        src="https://thingspeak.com/channels/2724105/charts/4?bgcolor=%23ffffff&color=%23d62020&dynamic=true&results=60&type=line&update=15"></iframe>   
+    
+      <div class="card plant_Status">
+        <h4>PLANT STATUS</h4><p><span class="reading"><span id="plant"></span></span></p>
+        <p> <button type="button" onclick= "plantConfirm()"> Confirm </button></p>
+      </div>
+
+      </div>
+
+
+    <div class="main-content">
+      <div class="cards">
+        <div class="card temperature">
+          <h4><i class="fas fa-thermometer-half"></i> BOARD #1 - TEMPERATURE</h4><p><span class="reading"><span id="t1"></span> &deg;C</span></p><p class="packet">Last Reading</span></p>
+        </div>
+        <div class="card humidity">
+          <h4><i class="fas fa-tint"></i> BOARD #1 - HUMIDITY</h4><p><span class="reading"><span id="h1"></span> &percnt;</span></p><p class="packet">Last Reading</span></p>
+        </div>
+        <div class ="card solid-humidity">
+          <h4><i class="fas fa-tint"></i> BOARD #1 - SOLID HUMIDITY</h4><p><span class="reading"><span id="ws1"></span> &percnt;</span></p><p class="packet">Last Reading</span></p>
+        </div>
+        <div class="card water-volume">
+          <h4><i class="fas fa-tint"></i> BOARD #1 - WATER VOLUME</h4><p><span class="reading"><span id="wv1"></span> cm<sup>3</sup></span></p><p class="packet">Last Reading</span></p>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+  
+  
+  <h2>Manual Mode</h2>
+  <label class="switch" id = "sw1"> 
+    <input type="checkbox" id = "ManualSwitch" onclick="ManualModeClick()">
+    <span class="slider round"></span>
+  </label>
+
+  <div id="ManualModeContent" class = "blurContent">
+    <p>Manual Mode Setting</p>
+
+    <!-- Motor Fan Control -->
+    <div class="Motor Fan">
+      <p>Motor Fan:</p>
+      <input type="range" min="0" max="100" value="0" id="myRange">
+      <p>Value: <span id="demo"></span> % PWM </p>
+    </div>
+
+    <!-- Lamp Control -->
+    <h2>Lamp Mode</h2>
+    <label class="switch" id = "sw1"> 
+      <input type="checkbox" id = "LampSwitch" onclick="LampModeClick()">
+      <span class="slider round"></span>
+    </label>
+
+    <!-- Motor Pump Control -->
+    <h2>Pump Mode</h2>
+    <label class="switch" id = "sw1"> 
+      <input type="checkbox" id = "PumpSwitch" onclick="PumpModeClick()">
+      <span class="slider round"></span>
+    </label>
+  </div>
+
+<script>
+
+var xhttp1 = new XMLHttpRequest();
+
+
+xhttp1.onreadystatechange = function () 
+{
+    const obj = JSON.parse(this.responseText);
+    var element1 = document.getElementById('t1');
+    element1.innerText = obj.temperature;
+    var element2 = document.getElementById('h1');
+    element2.innerText = obj.humidity;
+    var element3 = document.getElementById('ws1');
+    element3.innerText = obj.solidHumidity;
+    var element4 = document.getElementById('wv1');
+    element4.innerText = obj.waterVolume;
+    var element5 = document.getElementById('plant');
+    if( obj.plantStatus == 1)
+    {
+      element5.innerText = "Warning status, please check!";
+      element5.style.color = "red";
+    }
+    else
+    {
+      element5.innerText = "No other problem detected.";
+      element5.style.color = "";
+    }
+}
+
+function plantConfirm() {
+  xhttp1.open("POST", "/camCheck", true);
+  xhttp1.send("Plant Status: 0 .");
+}
+
+function refreshIframe(iframeId) {
+        const iframe = document.getElementById(iframeId);
+        const currentSrc = iframe.src;
+        iframe.src = currentSrc;
+    }
+
+setInterval(() => {
+    refreshIframe('chart1');
+    refreshIframe('chart2');
+    refreshIframe('chart3');
+    refreshIframe('chart4');
+}, 10000);
+
+function ManualModeClick()
+{
+    var checkBox = document.getElementById("ManualSwitch");
+    var blurEvent = document.getElementById("ManualModeContent");
+    if(checkBox.checked == true)
+    {
+        xhttp1.open("POST", "/switch1", true);
+        xhttp1.send("1");
+        blurEvent.classList.remove("blurContent");
+        blurEvent.classList.add("unblurContent");
+    } 
+    else
+    {
+        xhttp1.open("POST", "/switch1", true);
+        xhttp1.send("0");
+        blurEvent.classList.remove("unblurContent");
+        blurEvent.classList.add("blurContent");
+    }
+}
+
+function LampModeClick()
+{
+    var checkBox = document.getElementById("LampSwitch");
+    if(checkBox.checked == true)
+    {
+        xhttp1.open("POST", "/motorMode", true);
+        xhttp1.send("Lamp: 1 ");
+    } 
+    else
+    {
+        xhttp1.open("POST", "/motorMode", true);
+        xhttp1.send("Lamp: 0 ");
+    }
+}
+
+function PumpModeClick()
+{
+    var checkBox = document.getElementById("PumpSwitch");
+    if(checkBox.checked == true)
+    {
+        xhttp1.open("POST", "/motorMode", true);
+        xhttp1.send("Motor Pump: 1 ");
+    } 
+    else
+    {
+        xhttp1.open("POST", "/motorMode", true);
+        xhttp1.send("Motor Pump: 0 ");
+    }
+}
+
+setInterval(function() 
+{
+    xhttp1.open("GET", "/getData", true);
+    xhttp1.send();
+}, 1000 ) ;
+
+var slider = document.getElementById("myRange");
+var output = document.getElementById("demo");
+output.innerHTML = slider.value;
+
+slider.oninput = function() {
+  output.innerHTML = this.value;
+}
+
+slider.onchange = function() {
+  xhttp1.open("POST", "/motorMode", true);
+  xhttp1.send("Motor PWM: " + this.value + " ");
+}
+
+</script>
+</body>
+</html>
